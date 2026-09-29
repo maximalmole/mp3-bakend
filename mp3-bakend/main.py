@@ -46,9 +46,9 @@ def descargar_mp3(url: str):
     
     has_cookies = setup_cookies()
 
-    # Formato flexible ba/b para garantizar la extracción
+    # Incluimos 'web' para compatibilidad completa con cookies exportadas del navegador
     ydl_opts = {
-        'format': 'ba/b',
+        'format': 'bestaudio/best',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -59,17 +59,14 @@ def descargar_mp3(url: str):
         'no_warnings': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'android', 'mweb']
+                'player_client': ['web', 'mweb', 'android', 'ios']
             }
-        },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
         }
     }
 
     if has_cookies and os.path.exists(COOKIES_PATH):
         ydl_opts['cookiefile'] = COOKIES_PATH
-    
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
