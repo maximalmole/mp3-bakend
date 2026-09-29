@@ -22,21 +22,32 @@ DOWNLOAD_DIR = "/tmp/descargas"
 COOKIES_PATH = "/tmp/cookies_render.txt"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# Cargar cookies desde la Variable de Entorno Privada de Render
-cookies_env = os.getenv("YOUTUBE_COOKIES")
-if cookies_env:
-    with open(COOKIES_PATH, "w", encoding="utf-8") as f:
-        f.write(cookies_env)
+def setup_cookies():
+    """Genera el archivo de cookies desde la Variable de Entorno de Render si existe."""
+    cookies_env = os.getenv("YOUTUBE_COOKIES")
+    if cookies_env and len(cookies_env.strip()) > 50:
+        with open(COOKIES_PATH, "w", encoding="utf-8") as f:
+            f.write(cookies_env.strip())
+        return True
+    return False
 
 @app.get("/")
 def home():
-    return {"status": "Servidor de extracción MP3 activo"}
+    has_cookies = setup_cookies()
+    return {
+        "status": "Servidor de extracción MP3 activo",
+        "cookies_cargadas": has_cookies
+    }
 
 @app.get("/descargar-mp3")
 def descargar_mp3(url: str):
     file_id = str(uuid.uuid4())
     output_template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
     
+    # Verificar y preparar cookies
+    has_cookies = setup_cookies()
+
+    # Opciones con simulación de clientes móviles para evadir detección de bots en la nube
     ydl_opts = {
         'format': 'ba/b',
         'postprocessors': [{
@@ -49,13 +60,15 @@ def descargar_mp3(url: str):
         'no_warnings': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'android', 'mweb']
+                'player_client': ['ios', 'android', 'mweb', 'web_safari']
             }
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1',
         }
     }
 
-    # Si existen cookies privadas en /tmp/
-    if os.path.exists(COOKIES_PATH):
+    if has_cookies and os.path.exists(COOKIES_PATH):
         ydl_opts['cookiefile'] = COOKIES_PATH
     
     try:
