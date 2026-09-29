@@ -9,18 +9,24 @@ import yt_dlp
 
 app = FastAPI()
 
-# Permite que el JavaScript de tu web lea el header con el título original
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["Content-Disposition"], # <--- Permiso clave para leer el nombre
+    expose_headers=["Content-Disposition"],
 )
 
 DOWNLOAD_DIR = "/tmp/descargas"
+COOKIES_PATH = "/tmp/cookies_render.txt"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+# Cargar cookies desde la Variable de Entorno Privada de Render
+cookies_env = os.getenv("YOUTUBE_COOKIES")
+if cookies_env:
+    with open(COOKIES_PATH, "w", encoding="utf-8") as f:
+        f.write(cookies_env)
 
 @app.get("/")
 def home():
@@ -41,10 +47,16 @@ def descargar_mp3(url: str):
         'outtmpl': output_template,
         'quiet': True,
         'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['ios', 'android', 'mweb']
+            }
+        }
     }
 
-    if os.path.exists("cookies.txt"):
-        ydl_opts['cookiefile'] = "cookies.txt"
+    # Si existen cookies privadas en /tmp/
+    if os.path.exists(COOKIES_PATH):
+        ydl_opts['cookiefile'] = COOKIES_PATH
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -52,12 +64,9 @@ def descargar_mp3(url: str):
             filename = ydl.prepare_filename(info)
             mp3_filename = os.path.splitext(filename)[0] + ".mp3"
             
-            # Obtener el título original del video de YouTube
             titulo_raw = info.get('title', 'audio')
-            # Limpiar caracteres no permitidos en nombres de archivo
             titulo_limpio = re.sub(r'[\\/*?:"<>|]', "", titulo_raw) + ".mp3"
 
-        # Codificar el título para compatibilidad con caracteres especiales (acentos, ñ, etc.)
         encoded_filename = quote(titulo_limpio)
         headers = {
             "Content-Disposition": f'attachment; filename="{titulo_limpio}"; filename*=UTF-8\'\'{encoded_filename}'
