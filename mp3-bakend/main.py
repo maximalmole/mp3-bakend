@@ -23,7 +23,7 @@ COOKIES_PATH = "/tmp/cookies_render.txt"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 def setup_cookies():
-    """Carga las cookies desde la Variable de Entorno en Render."""
+    """Carga y escribe las cookies desde la Variable de Entorno YOUTUBE_COOKIES en Render."""
     cookies_env = os.getenv("YOUTUBE_COOKIES")
     if cookies_env and len(cookies_env.strip()) > 50:
         with open(COOKIES_PATH, "w", encoding="utf-8") as f:
@@ -46,7 +46,7 @@ def descargar_mp3(url: str):
     
     has_cookies = setup_cookies()
 
-    # Utilizar 'ba/b' para prevenir errores de 'Requested format is not available'
+    # Formato flexible ba/b para garantizar la extracción
     ydl_opts = {
         'format': 'ba/b',
         'postprocessors': [{
@@ -61,6 +61,9 @@ def descargar_mp3(url: str):
             'youtube': {
                 'player_client': ['ios', 'android', 'mweb']
             }
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
         }
     }
 
