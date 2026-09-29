@@ -27,7 +27,7 @@ def descargar_mp3(url: str):
     file_id = str(uuid.uuid4())
     output_template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
     
-    # Opciones de yt-dlp optimizadas para evitar bloqueos en servidores en la nube (Render)
+    # Opciones de yt-dlp optimizadas para evadir la detección de bots en servidores en la nube
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -40,13 +40,17 @@ def descargar_mp3(url: str):
         'no_warnings': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios', 'web']
+                'player_client': ['mweb', 'ios', 'tv']
             }
         },
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
         }
     }
+
+    # Si tienes un archivo cookies.txt en el repositorio, yt-dlp lo usará automáticamente:
+    if os.path.exists("cookies.txt"):
+        ydl_opts['cookiefile'] = "cookies.txt"
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
