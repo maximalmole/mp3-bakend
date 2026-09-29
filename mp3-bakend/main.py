@@ -7,7 +7,6 @@ import yt_dlp
 
 app = FastAPI()
 
-# Permite llamadas desde CodePen o cualquier cliente web
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,7 +26,8 @@ def home():
 def descargar_mp3(url: str):
     file_id = str(uuid.uuid4())
     output_template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
-
+    
+    # Opciones de yt-dlp optimizadas para evitar bloqueos en servidores en la nube (Render)
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -38,8 +38,16 @@ def descargar_mp3(url: str):
         'outtmpl': output_template,
         'quiet': True,
         'no_warnings': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios', 'web']
+            }
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        }
     }
-
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
@@ -48,8 +56,8 @@ def descargar_mp3(url: str):
             titulo_original = info.get('title', 'audio') + ".mp3"
 
         return FileResponse(
-            path=mp3_filename,
-            filename=titulo_original,
+            path=mp3_filename, 
+            filename=titulo_original, 
             media_type='audio/mpeg'
         )
     except Exception as e:
