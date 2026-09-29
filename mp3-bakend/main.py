@@ -27,9 +27,9 @@ def descargar_mp3(url: str):
     file_id = str(uuid.uuid4())
     output_template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
     
-    # Opciones de yt-dlp optimizadas para evadir la detección de bots en servidores en la nube
+    # Configuración flexible de formato: 'ba/b' busca solo audio (ba), o video+audio (b) para extraer el MP3
     ydl_opts = {
-        'format': 'bestaudio/best',
+        'format': 'ba/b',
         'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
@@ -38,17 +38,9 @@ def descargar_mp3(url: str):
         'outtmpl': output_template,
         'quiet': True,
         'no_warnings': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['mweb', 'ios', 'tv']
-            }
-        },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-        }
     }
 
-    # Si tienes un archivo cookies.txt en el repositorio, yt-dlp lo usará automáticamente:
+    # Usar cookies si existen en el repositorio
     if os.path.exists("cookies.txt"):
         ydl_opts['cookiefile'] = "cookies.txt"
     
