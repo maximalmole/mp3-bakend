@@ -1,18 +1,22 @@
 import os
 import uuid
+import re
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from urllib.parse import quote
 import yt_dlp
 
 app = FastAPI()
 
+# Permite que el JavaScript de tu web lea el header con el título original
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"], # <--- Permiso clave para leer el nombre
 )
 
 DOWNLOAD_DIR = "/tmp/descargas"
@@ -27,7 +31,6 @@ def descargar_mp3(url: str):
     file_id = str(uuid.uuid4())
     output_template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
     
-    # Configuración flexible de formato: 'ba/b' busca solo audio (ba), o video+audio (b) para extraer el MP3
     ydl_opts = {
         'format': 'ba/b',
         'postprocessors': [{
@@ -40,7 +43,6 @@ def descargar_mp3(url: str):
         'no_warnings': True,
     }
 
-    # Usar cookies si existen en el repositorio
     if os.path.exists("cookies.txt"):
         ydl_opts['cookiefile'] = "cookies.txt"
     
@@ -49,12 +51,22 @@ def descargar_mp3(url: str):
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
             mp3_filename = os.path.splitext(filename)[0] + ".mp3"
-            titulo_original = info.get('title', 'audio') + ".mp3"
+            
+            # Obtener el título original del video de YouTube
+            titulo_raw = info.get('title', 'audio')
+            # Limpiar caracteres no permitidos en nombres de archivo
+            titulo_limpio = re.sub(r'[\\/*?:"<>|]', "", titulo_raw) + ".mp3"
+
+        # Codificar el título para compatibilidad con caracteres especiales (acentos, ñ, etc.)
+        encoded_filename = quote(titulo_limpio)
+        headers = {
+            "Content-Disposition": f'attachment; filename="{titulo_limpio}"; filename*=UTF-8\'\'{encoded_filename}'
+        }
 
         return FileResponse(
             path=mp3_filename, 
-            filename=titulo_original, 
-            media_type='audio/mpeg'
+            media_type='audio/mpeg',
+            headers=headers
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
