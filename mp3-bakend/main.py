@@ -1,7 +1,7 @@
 import os
 import uuid
 import re
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from urllib.parse import quote
@@ -22,8 +22,16 @@ DOWNLOAD_DIR = "/tmp/descargas"
 COOKIES_PATH = "/tmp/cookies_render.txt"
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+def cleanup_file(filepath: str):
+    """Elimina el archivo descargado para evitar sobrepasar los 512 MB de RAM en Render."""
+    try:
+        if os.path.exists(filepath):
+            os.remove(filepath)
+    except Exception as e:
+        print(f"Error al eliminar {filepath}: {e}")
+
 def setup_cookies():
-    """Carga y escribe las cookies desde la Variable de Entorno YOUTUBE_COOKIES en Render."""
+    """Genera el archivo de cookies desde la Variable de Entorno YOUTUBE_COOKIES en Render."""
     cookies_env = os.getenv("YOUTUBE_COOKIES")
     if cookies_env and len(cookies_env.strip()) > 50:
         with open(COOKIES_PATH, "w", encoding="utf-8") as f:
@@ -35,18 +43,23 @@ def setup_cookies():
 def home():
     has_cookies = setup_cookies()
     return {
-        "status": "Servidor de extracción MP3 activo",
+        "status": "Servidor de extracción MP3 activo (Optimizado para memoria RAM)",
         "cookies_cargadas": has_cookies
     }
 
 @app.get("/descargar-mp3")
-def descargar_mp3(url: str):
+def descargar_mp3(url: str, background_tasks: BackgroundTasks):
+    # Limpiar cualquier archivo huérfano previo en la carpeta de descargas
+    for f in os.listdir(DOWNLOAD_DIR):
+        file_path = os.path.join(DOWNLOAD_DIR, f)
+        if os.path.isfile(file_path):
+            cleanup_file(file_path)
+
     file_id = str(uuid.uuid4())
     output_template = os.path.join(DOWNLOAD_DIR, f"{file_id}.%(ext)s")
     
     has_cookies = setup_cookies()
 
-    # Incluimos 'web' para compatibilidad completa con cookies exportadas del navegador
     ydl_opts = {
         'format': 'bestaudio/best',
         'postprocessors': [{
@@ -57,6 +70,7 @@ def descargar_mp3(url: str):
         'outtmpl': output_template,
         'quiet': True,
         'no_warnings': True,
+        'concurrent_fragment_downloads': 1,  # Limita el uso de CPU/RAM durante la descarga
         'extractor_args': {
             'youtube': {
                 'player_client': ['web', 'mweb', 'android', 'ios']
@@ -80,6 +94,9 @@ def descargar_mp3(url: str):
         headers = {
             "Content-Disposition": f'attachment; filename="{titulo_limpio}"; filename*=UTF-8\'\'{encoded_filename}'
         }
+
+        # Programar la eliminación automática del archivo MP3 una vez enviado al usuario
+        background_tasks.add_task(cleanup_file, mp3_filename)
 
         return FileResponse(
             path=mp3_filename, 
